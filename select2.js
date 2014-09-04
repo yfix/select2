@@ -699,12 +699,15 @@ the specific language governing permissions and limitations under the Apache Lic
 
             this.container = this.createContainer();
 
-            this.liveRegion = $("<span>", {
-                    role: "status",
-                    "aria-live": "polite"
-                })
-                .addClass("select2-hidden-accessible")
-                .appendTo(document.body);
+            this.liveRegion = $('.select2-hidden-accessible');
+            if (this.liveRegion.length == 0) {
+                this.liveRegion = $("<span>", {
+                        role: "status",
+                        "aria-live": "polite"
+                    })
+                    .addClass("select2-hidden-accessible")
+                    .appendTo(document.body);
+            }
 
             this.containerId="s2id_"+(opts.element.attr("id") || "autogen"+nextUid());
             this.containerEventName= this.containerId
@@ -1222,9 +1225,10 @@ the specific language governing permissions and limitations under the Apache Lic
         // abstract
         positionDropdown: function() {
             var $dropdown = this.dropdown,
-                offset = this.container.offset(),
-                height = this.container.outerHeight(false),
-                width = this.container.outerWidth(false),
+                container = this.container,
+                offset = container.offset(),
+                height = container.outerHeight(false),
+                width = container.outerWidth(false),
                 dropHeight = $dropdown.outerHeight(false),
                 $window = $(window),
                 windowWidth = $window.width(),
@@ -1236,7 +1240,12 @@ the specific language governing permissions and limitations under the Apache Lic
                 enoughRoomBelow = dropTop + dropHeight <= viewportBottom,
                 enoughRoomAbove = (offset.top - dropHeight) >= $window.scrollTop(),
                 dropWidth = $dropdown.outerWidth(false),
-                enoughRoomOnRight = dropLeft + dropWidth <= viewPortRight,
+                enoughRoomOnRight = function() {
+                    return dropLeft + dropWidth <= viewPortRight;
+                },
+                enoughRoomOnLeft = function() {
+                    return offset.left + viewPortRight + container.outerWidth(false)  > dropWidth;
+                },
                 aboveNow = $dropdown.hasClass("select2-drop-above"),
                 bodyOffset,
                 above,
@@ -1271,7 +1280,6 @@ the specific language governing permissions and limitations under the Apache Lic
                 dropTop = offset.top + height;
                 dropLeft = offset.left;
                 dropWidth = $dropdown.outerWidth(false);
-                enoughRoomOnRight = dropLeft + dropWidth <= viewPortRight;
                 $dropdown.show();
 
                 // fix so the cursor does not move to the left within the search-textbox in IE
@@ -1286,7 +1294,6 @@ the specific language governing permissions and limitations under the Apache Lic
                 dropWidth = $dropdown.outerWidth(false) + (resultsListNode.scrollHeight === resultsListNode.clientHeight ? 0 : scrollBarDimensions.width);
                 dropWidth > width ? width = dropWidth : dropWidth = width;
                 dropHeight = $dropdown.outerHeight(false);
-                enoughRoomOnRight = dropLeft + dropWidth <= viewPortRight;
             }
             else {
                 this.container.removeClass('select2-drop-auto-width');
@@ -1302,7 +1309,7 @@ the specific language governing permissions and limitations under the Apache Lic
                 dropLeft -= bodyOffset.left;
             }
 
-            if (!enoughRoomOnRight) {
+            if (!enoughRoomOnRight() && enoughRoomOnLeft()) {
                 dropLeft = offset.left + this.container.outerWidth(false) - dropWidth;
             }
 
@@ -3230,7 +3237,7 @@ the specific language governing permissions and limitations under the Apache Lic
                     if (equal(this.opts.id(current[i]), this.opts.id(old[j]))) {
                         current.splice(i, 1);
                         if(i>0){
-                        	i--;
+                            i--;
                         }
                         old.splice(j, 1);
                         j--;
@@ -3413,11 +3420,11 @@ the specific language governing permissions and limitations under the Apache Lic
         dropdownCssClass: "",
         formatResult: function(result, container, query, escapeMarkup) {
             var markup=[];
-            markMatch(result.text, query.term, markup, escapeMarkup);
+            markMatch(this.text(result), query.term, markup, escapeMarkup);
             return markup.join("");
         },
         formatSelection: function (data, container, escapeMarkup) {
-            return data ? escapeMarkup(data.text) : undefined;
+            return data ? escapeMarkup(this.text(data)) : undefined;
         },
         sortResults: function (results, container, query) {
             return results;
@@ -3429,6 +3436,17 @@ the specific language governing permissions and limitations under the Apache Lic
         maximumInputLength: null,
         maximumSelectionSize: 0,
         id: function (e) { return e == undefined ? null : e.id; },
+        text: function (e) {
+          if (e && this.data && this.data.text) {
+            if ($.isFunction(this.data.text)) {
+              return this.data.text(e);
+            } else {
+              return e[this.data.text];
+            }
+          } else {
+            return e.text;
+          }
+        },
         matcher: function(term, text) {
             return stripDiacritics(''+text).toUpperCase().indexOf(stripDiacritics(''+term).toUpperCase()) >= 0;
         },
