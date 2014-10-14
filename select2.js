@@ -132,7 +132,7 @@ the specific language governing permissions and limitations under the Apache Lic
 
     function measureScrollbar () {
         var $template = $( MEASURE_SCROLLBAR_TEMPLATE );
-        $template.appendTo('body');
+        $template.appendTo(document.body);
 
         var dim = {
             width: $template.width() - $template[0].clientWidth,
@@ -160,16 +160,16 @@ the specific language governing permissions and limitations under the Apache Lic
     }
 
     /**
-     * Splits the string into an array of values, trimming each value. An empty array is returned for nulls or empty
+     * Splits the string into an array of values, transforming each value. An empty array is returned for nulls or empty
      * strings
      * @param string
      * @param separator
      */
-    function splitVal(string, separator) {
+    function splitVal(string, separator, transform) {
         var val, i, l;
         if (string === null || string.length < 1) return [];
         val = string.split(separator);
-        for (i = 0, l = val.length; i < l; i = i + 1) val[i] = $.trim(val[i]);
+        for (i = 0, l = val.length; i < l; i = i + 1) val[i] = transform(val[i]);
         return val;
     }
 
@@ -311,7 +311,7 @@ the specific language governing permissions and limitations under the Apache Lic
                 whiteSpace: "nowrap"
             });
             sizer.attr("class","select2-sizer");
-            $("body").append(sizer);
+            $(document.body).append(sizer);
         }
         sizer.text(e.val());
         return sizer.width();
@@ -717,7 +717,7 @@ the specific language governing permissions and limitations under the Apache Lic
 
             this.container.attr("title", opts.element.attr("title"));
 
-            this.body = $("body");
+            this.body = $(document.body);
 
             syncCssClasses(this.container, this.opts.element, this.opts.adaptContainerCssClass);
 
@@ -855,7 +855,9 @@ the specific language governing permissions and limitations under the Apache Lic
 
             if (element.length && element[0].detachEvent && self._sync) {
                 element.each(function () {
-                    this.detachEvent("onpropertychange", self._sync);
+                    if (self._sync) {
+                        this.detachEvent("onpropertychange", self._sync);
+                    }
                 });
             }
             if (this.propertyObserver) {
@@ -1061,7 +1063,7 @@ the specific language governing permissions and limitations under the Apache Lic
                         if (opts.initSelection === undefined) {
                             opts.initSelection = function (element, callback) {
                                 var data = [];
-                                $(splitVal(element.val(), opts.separator)).each(function () {
+                                $(splitVal(element.val(), opts.separator, opts.transformVal)).each(function () {
                                     var obj = { id: this, text: this },
                                         tags = opts.tags;
                                     if ($.isFunction(tags)) tags=tags();
@@ -1116,11 +1118,15 @@ the specific language governing permissions and limitations under the Apache Lic
                 if (readonly === undefined) readonly = false;
                 this.readonly(readonly);
 
-                syncCssClasses(this.container, this.opts.element, this.opts.adaptContainerCssClass);
-                this.container.addClass(evaluate(this.opts.containerCssClass, this.opts.element));
+                if (this.container) {
+                    syncCssClasses(this.container, this.opts.element, this.opts.adaptContainerCssClass);
+                    this.container.addClass(evaluate(this.opts.containerCssClass, this.opts.element));
+                }
 
-                syncCssClasses(this.dropdown, this.opts.element, this.opts.adaptDropdownCssClass);
-                this.dropdown.addClass(evaluate(this.opts.dropdownCssClass, this.opts.element));
+                if (this.dropdown) {
+                    syncCssClasses(this.dropdown, this.opts.element, this.opts.adaptDropdownCssClass);
+                    this.dropdown.addClass(evaluate(this.opts.dropdownCssClass, this.opts.element));
+                }
 
             });
 
@@ -1532,7 +1538,7 @@ the specific language governing permissions and limitations under the Apache Lic
                 }
             }
 
-            rb = results.offset().top + results.outerHeight(true);
+            rb = results.offset().top + results.outerHeight(false);
             if (hb > rb) {
                 results.scrollTop(results.scrollTop() + (hb - rb));
             }
@@ -1655,7 +1661,7 @@ the specific language governing permissions and limitations under the Apache Lic
                     self.postprocessResults(data, false, false);
 
                     if (data.more===true) {
-                        more.detach().appendTo(results).text(evaluate(self.opts.formatLoadMore, self.opts.element, page+1));
+                        more.detach().appendTo(results).html(self.opts.escapeMarkup(evaluate(self.opts.formatLoadMore, self.opts.element, page+1)));
                         window.setTimeout(function() { self.loadMoreIfNeeded(); }, 10);
                     } else {
                         more.remove();
@@ -2589,7 +2595,6 @@ the specific language governing permissions and limitations under the Apache Lic
                 self=this;
 
             // TODO validate placeholder is a string if specified
-
             if (opts.element.get(0).tagName.toLowerCase() === "select") {
                 // install the selection initializer
                 opts.initSelection = function (element, callback) {
@@ -2604,7 +2609,7 @@ the specific language governing permissions and limitations under the Apache Lic
             } else if ("data" in opts) {
                 // install default initSelection when applied to hidden input and data is local
                 opts.initSelection = opts.initSelection || function (element, callback) {
-                    var ids = splitVal(element.val(), opts.separator);
+                    var ids = splitVal(element.val(), opts.separator, opts.transformVal);
                     //search in data by array of ids, storing matching items in a list
                     var matches = [];
                     opts.query({
@@ -3052,7 +3057,7 @@ the specific language governing permissions and limitations under the Apache Lic
 
             formatted=this.opts.formatSelection(data, choice.find("div"), this.opts.escapeMarkup);
             if (formatted != undefined) {
-                choice.find("div").replaceWith("<div>"+formatted+"</div>");
+                choice.find("div").replaceWith($("<div></div>").html(formatted));
             }
             cssClass=this.opts.formatSelectionCssClass(data, choice.find("div"));
             if (cssClass != undefined) {
@@ -3207,7 +3212,7 @@ the specific language governing permissions and limitations under the Apache Lic
                 return val === null ? [] : val;
             } else {
                 val = this.opts.element.val();
-                return splitVal(val, this.opts.separator);
+                return splitVal(val, this.opts.separator, this.opts.transformVal);
             }
         },
 
@@ -3422,6 +3427,9 @@ the specific language governing permissions and limitations under the Apache Lic
             var markup=[];
             markMatch(this.text(result), query.term, markup, escapeMarkup);
             return markup.join("");
+        },
+        transformVal: function(val) {
+            return $.trim(val);
         },
         formatSelection: function (data, container, escapeMarkup) {
             return data ? escapeMarkup(this.text(data)) : undefined;
